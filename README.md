@@ -135,10 +135,12 @@ requires explicit permission and must never be committed or shared publicly.
 ## Setup
 
 Clone next to the main [dotfiles](https://github.com/SergioGasquez/dotfiles)
-and link the files by hand; `dot` manages only the main repository:
+and link the files by hand; `dot` manages only the main repository. Install the
+Homebrew formulae and casks in [`packages`](packages); `node@22` builds Seerr:
 
 ```bash
 gh repo clone SergioGasquez/dotfiles-media_server "$HOME/.dotfiles-media_server"
+xargs brew install < "$HOME/.dotfiles-media_server/packages"
 ln -sfn "$HOME/.dotfiles-media_server/shell/media_server.fish" "$HOME/.config/fish/conf.d/media_server.fish"
 mkdir -p "$HOME/.agents/skills"
 ln -sfn "$HOME/.dotfiles-media_server/pi/skills/media-server-repro" "$HOME/.agents/skills/media-server-repro"
