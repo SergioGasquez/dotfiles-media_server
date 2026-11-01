@@ -67,6 +67,12 @@ contain printer configuration or state. HaspelSync talks to Spoolman and the
 printer over the local network; do not publish printer identifiers or access
 codes. Neither service currently runs in a container.
 
+User LaunchAgents, including Spoolman and HaspelSync, run only while `sergio`
+is logged in at the Mac. Automatic login is on so they start after a reboot;
+set it from the logged-in desktop session (System Settings > Users & Groups),
+because `sysadminctl -autologin set` fails with error 22 over SSH. FileVault
+must stay off for automatic login to work.
+
 The stable app paths are symlinks to the current release, named after its
 GitHub tag:
 
