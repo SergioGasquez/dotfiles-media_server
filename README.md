@@ -39,7 +39,7 @@ jobs rather than assuming every template is installed. The setup notes in
 be copied into this repository.
 
 Seerr is a versioned local source install: `~/Server/media-server/seerr` is a
-symlink to `~/Server/media-server/releases/seerr/v3.4.1`. Its config/database
+symlink to a release in `~/Server/media-server/releases/seerr/`. Its config/database
 is separate at `~/Library/Application Support/seerr`. The existing system
 LaunchDaemon is **still active**. A matching user LaunchAgent is only staged at
 `~/Server/media-server/launch-agents/local.seerr.plist`; it is **not** installed
@@ -56,7 +56,8 @@ this Mac, so the cutover remains pending.
 | HaspelSync | Syncs Bambu Lab AMS spool state and print consumption with Spoolman | Local Node app; `local.haspelsync` user LaunchAgent | 4000 |
 
 Spoolman runs from `~/Server/spoolman/app` using
-`~/Server/spoolman/venv/bin/uvicorn`; its persistent data and backups are in
+`~/Server/spoolman/venv/bin/uvicorn`; `venv` links to `app/.venv`, so each
+release has its own virtual environment. Its persistent data and backups are in
 `~/Server/spoolman/data`, with logs in `~/Library/Logs/Spoolman`.
 HaspelSync runs `entrypoint.js` from `~/Server/haspelsync/app` with dependencies
 in `node_modules`. Its service sets `DATA_DIR=~/Server/haspelsync/data` and
@@ -66,18 +67,14 @@ contain printer configuration or state. HaspelSync talks to Spoolman and the
 printer over the local network; do not publish printer identifiers or access
 codes. Neither service currently runs in a container.
 
-The stable app paths are symlinks into `releases/`:
+The stable app paths are symlinks to the current release, named after its
+GitHub tag:
 
-| Stable path | Current release |
+| Stable path | Releases |
 | --- | --- |
-| `~/Server/spoolman/app` | `~/Server/spoolman/releases/v0.27.0` |
-| `~/Server/haspelsync/app` | `~/Server/haspelsync/releases/1.3.3` |
-| `~/Server/media-server/seerr` | `~/Server/media-server/releases/seerr/v3.4.1` |
-
-These release directories contain the **existing installs**, not freshly
-verified upstream archives. Spoolman and HaspelSync were restarted successfully
-after the relocation. Seerr stayed running; its cold restart from the new path
-has not been verified.
+| `~/Server/spoolman/app` | `~/Server/spoolman/releases/` |
+| `~/Server/haspelsync/app` | `~/Server/haspelsync/releases/` |
+| `~/Server/media-server/seerr` | `~/Server/media-server/releases/seerr/` |
 
 ## Updates, backups, and checks
 
@@ -89,13 +86,32 @@ Prowlarr casks with `--greedy`, then restarts with `launchctl kickstart -k` the
 upgraded apps' `local.*` daemons and any launchd service still running Homebrew
 files the upgrade removed (`stale_brew_services`; system daemons need `sudo`).
 A restarted service may need Local Network re-approval in System Settings >
-Privacy & Security > Local Network. **It does not update the source-installed
-Spoolman, HaspelSync, or Seerr**, and prints a warning about those three. A reliable updater would fetch/version a new release, back up the
-persistent data (including HaspelSync runtime files), build outside the active
-path, switch the symlink, restart the service, verify its health, and retain
-its previous release for rollback. Database migrations may also need their own
-rollback plan. Disk space is limited on this host; check it before staging
-another Seerr build. Do not run the full `upup` merely to test these services.
+Privacy & Security > Local Network.
+
+It then updates Spoolman, HaspelSync, and Seerr to their latest GitHub
+releases. For each app that is behind, it:
+
+1. Checks that launchd has the service loaded. The Spoolman and HaspelSync user
+   agents exist only while someone is logged in at the Mac; without that login,
+   for example over SSH after a reboot, `upup` skips them with a warning.
+2. Builds the release in `releases/<tag>` while the old one keeps running:
+   Spoolman from `spoolman.zip` with its own `uv` virtual environment,
+   HaspelSync from the source tarball with `npm ci --omit=dev` plus a copy of
+   `app/printers/`, and Seerr from a shallow clone of the tag with its
+   `packageManager` pnpm on Node 22, as in its Dockerfile.
+3. Backs up the data to `backups/<app>-<old release>-<timestamp>` next to the
+   app link: `sqlite3 .backup` copies of the Spoolman and Seerr databases,
+   Seerr's `settings.json`, and HaspelSync's `data/`.
+4. Switches the app link, restarts the service (`sudo` for Seerr's system
+   daemon), and waits up to two minutes for its HTTP endpoint.
+5. Deletes all releases except the new and previous ones. If the service does
+   not answer, it switches the link back, restarts the old release, and stops
+   `upup`.
+
+Spoolman and Seerr migrate their databases when they start, and switching back
+does not undo that. If the old release fails on the migrated database, stop the
+service and restore the database from the printed backup folder. Do not run the
+full `upup` merely to test these services.
 
 Read-only local checks (ports are examples of the current setup):
 
