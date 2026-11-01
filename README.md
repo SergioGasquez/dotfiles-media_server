@@ -2,7 +2,7 @@
 
 This describes the **current installation on this Mac**, not a one-command
 installer. Application data, service definitions, and credentials live outside
-this dotfiles repository. Paths below use `~` instead of a machine-specific
+this repository. Paths below use `~` instead of a machine-specific
 username; do not commit databases, API keys, printer access codes, or local
 network details.
 
@@ -81,14 +81,16 @@ has not been verified.
 
 ## Updates, backups, and checks
 
-The macOS Zsh configuration in [`shell/zshrc`](shell/zshrc) is intended for
-`~/.zshrc`; its mapping is commented out in [`.mappings`](../.mappings). Its `upup` updates Homebrew and explicitly checks the installed
-Jellyfin, Sonarr, Radarr, and Prowlarr casks with `--greedy`, in addition to its
-Cargo, Rust, Espressif, and Pi steps. The Fish `upup` in
-[`mac-os/shell/platform.fish`](../mac-os/shell/platform.fish) runs the ordinary
-Homebrew upgrade, not the extra cask checks. **Neither command updates the
-source-installed Spoolman, HaspelSync, or Seerr.** Zsh prints a warning about
-those three. A reliable updater would fetch/version a new release, back up the
+The Fish `upup` in
+[`mac-os/shell/platform.fish`](https://github.com/SergioGasquez/dotfiles/blob/main/mac-os/shell/platform.fish)
+calls `media_server_update` from [`shell/media_server.fish`](shell/media_server.fish)
+after `brew upgrade`. It upgrades the installed Jellyfin, Sonarr, Radarr, and
+Prowlarr casks with `--greedy`, then restarts with `launchctl kickstart -k` the
+upgraded apps' `local.*` daemons and any launchd service still running Homebrew
+files the upgrade removed (`stale_brew_services`; system daemons need `sudo`).
+A restarted service may need Local Network re-approval in System Settings >
+Privacy & Security > Local Network. **It does not update the source-installed
+Spoolman, HaspelSync, or Seerr**, and prints a warning about those three. A reliable updater would fetch/version a new release, back up the
 persistent data (including HaspelSync runtime files), build outside the active
 path, switch the symlink, restart the service, verify its health, and retain
 its previous release for rollback. Database migrations may also need their own
@@ -104,6 +106,18 @@ for port in 7912 4000 5055; do curl -fsS -o /dev/null -w "$port: %{http_code}\n"
 ```
 
 The [media-server-repro Pi skill](pi/skills/media-server-repro/SKILL.md) can
-create a sanitized inventory bundle. Its `~/.agents/skills/media-server-repro`
-mapping is commented out in [`.mappings`](../.mappings). Its optional sensitive backup mode
+create a sanitized inventory bundle; it is linked to
+`~/.agents/skills/media-server-repro` (see [Setup](#setup)). Its optional sensitive backup mode
 requires explicit permission and must never be committed or shared publicly.
+
+## Setup
+
+Clone next to the main [dotfiles](https://github.com/SergioGasquez/dotfiles)
+and link the files by hand; `dot` manages only the main repository:
+
+```bash
+gh repo clone SergioGasquez/dotfiles-media_server "$HOME/.dotfiles-media_server"
+ln -sfn "$HOME/.dotfiles-media_server/shell/media_server.fish" "$HOME/.config/fish/conf.d/media_server.fish"
+mkdir -p "$HOME/.agents/skills"
+ln -sfn "$HOME/.dotfiles-media_server/pi/skills/media-server-repro" "$HOME/.agents/skills/media-server-repro"
+```
